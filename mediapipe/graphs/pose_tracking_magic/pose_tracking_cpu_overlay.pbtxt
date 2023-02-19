@@ -1,0 +1,69 @@
+# MediaPipe graph that performs pose tracking with TensorFlow Lite on CPU and renders the pose overlay landmarks.
+
+# CPU buffer. (ImageFrame)
+input_stream: "input_video"
+
+# Output image with rendered results. (ImageFrame)
+output_stream: "output_video"
+
+# Pose landmarks. (NormalizedLandmarkList)
+output_stream: "pose_landmarks"
+
+# Generates side packet to enable segmentation.
+node {
+  calculator: "ConstantSidePacketCalculator"
+  output_side_packet: "PACKET:enable_segmentation"
+  node_options: {
+    [type.googleapis.com/mediapipe.ConstantSidePacketCalculatorOptions]: {
+      packet { bool_value: true }
+    }
+  }
+}
+
+# Converts the GPU buffer to CPU buffer
+node: {
+  calculator: "GpuBufferToImageFrameCalculator"
+  input_stream: "input_video"
+  output_stream: "input_video_cpu"
+}
+
+# Throttles the images flowing downstream for flow control.
+node {
+  calculator: "FlowLimiterCalculator"
+  input_stream: "input_video"
+  input_stream: "FINISHED:output_video"
+  input_stream_info: {
+    tag_index: "FINISHED"
+    back_edge: true
+  }
+  output_stream: "throttled_input_video"
+}
+
+# Subgraph that detects poses and corresponding landmarks.
+node {
+  calculator: "PoseLandmarkCpu"
+  input_side_packet: "ENABLE_SEGMENTATION:enable_segmentation"
+  input_stream: "IMAGE:throttled_input_video"
+  output_stream: "LANDMARKS:pose_landmarks"
+  output_stream: "SEGMENTATION_MASK:segmentation_mask"
+  output_stream: "DETECTION:pose_detection"
+  output_stream: "ROI_FROM_LANDMARKS:roi_from_landmarks"
+}
+
+# Subgraph that renders pose-landmark annotation onto the input image.
+node {
+  calculator: "PoseRendererCpu"
+  input_stream: "IMAGE:throttled_input_video"
+  input_stream: "LANDMARKS:pose_landmarks"
+  input_stream: "SEGMENTATION_MASK:segmentation_mask"
+  input_stream: "DETECTION:pose_detection"
+  input_stream: "ROI:roi_from_landmarks"
+  output_stream: "IMAGE:output_video_cpu"
+}
+
+# Converts the CPU buffer to GPU buffer
+node: {
+  calculator: "ImageFrameToGpuBufferCalculator"
+  input_stream: "output_video_cpu"
+  output_stream: "output_video"
+}

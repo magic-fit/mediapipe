@@ -53,6 +53,20 @@ mediapipe_simple_subgraph(
     ],
 )
 
+mediapipe_simple_subgraph(
+    name = "pose_detection_npu",
+    graph = "pose_detection_npu.pbtxt",
+    register_as = "PoseDetectionNpu",
+    deps = [
+        "//mediapipe/calculators/tensor:image_to_tensor_calculator",
+        "//mediapipe/calculators/tensor:inference_calculator",
+        "//mediapipe/calculators/tensor:tensors_to_detections_calculator",
+        "//mediapipe/calculators/tflite:ssd_anchors_calculator",
+        "//mediapipe/calculators/util:detection_letterbox_removal_calculator",
+        "//mediapipe/calculators/util:non_max_suppression_calculator",
+    ],
+)
+
 mediapipe_files(
     srcs = [
         "pose_detection.tflite",
