@@ -19,6 +19,27 @@ package(default_visibility = [
 licenses(["notice"])
 
 cc_library(
+    name = "tensors_to_face_landmarks_graph",
+    srcs = ["tensors_to_face_landmarks_graph.cc"],
+    deps = [
+        "//mediapipe/calculators/core:split_vector_calculator",
+        "//mediapipe/calculators/core:split_vector_calculator_cc_proto",
+        "//mediapipe/calculators/tensor:tensors_to_landmarks_calculator",
+        "//mediapipe/calculators/tensor:tensors_to_landmarks_calculator_cc_proto",
+        "//mediapipe/calculators/util:landmarks_refinement_calculator",
+        "//mediapipe/calculators/util:landmarks_refinement_calculator_cc_proto",
+        "//mediapipe/framework:calculator_cc_proto",
+        "//mediapipe/framework:calculator_framework",
+        "//mediapipe/framework:subgraph",
+        "//mediapipe/framework/api2:builder",
+        "//mediapipe/framework/formats:landmark_cc_proto",
+        "//mediapipe/framework/formats:tensor",
+        "//mediapipe/tasks/cc/vision/face_landmarker/proto:tensors_to_face_landmarks_graph_options_cc_proto",
+    ],
+    alwayslink = 1,
+)
+
+cc_library(
     name = "face_blendshapes_graph",
     srcs = ["face_blendshapes_graph.cc"],
     deps = [
@@ -48,11 +69,14 @@ cc_library(
     name = "face_landmarks_detector_graph",
     srcs = ["face_landmarks_detector_graph.cc"],
     deps = [
+        ":face_blendshapes_graph",
+        ":tensors_to_face_landmarks_graph",
         "//mediapipe/calculators/core:begin_loop_calculator",
         "//mediapipe/calculators/core:end_loop_calculator",
         "//mediapipe/calculators/core:split_vector_calculator",
         "//mediapipe/calculators/core:split_vector_calculator_cc_proto",
         "//mediapipe/calculators/image:image_properties_calculator",
+        "//mediapipe/calculators/tensor:image_to_tensor_calculator_cc_proto",
         "//mediapipe/calculators/tensor:inference_calculator",
         "//mediapipe/calculators/tensor:tensors_to_floats_calculator",
         "//mediapipe/calculators/tensor:tensors_to_floats_calculator_cc_proto",
@@ -67,8 +91,11 @@ cc_library(
         "//mediapipe/calculators/util:rect_transformation_calculator_cc_proto",
         "//mediapipe/calculators/util:thresholding_calculator",
         "//mediapipe/calculators/util:thresholding_calculator_cc_proto",
+        "//mediapipe/framework:calculator_framework",
+        "//mediapipe/framework:calculator_options_cc_proto",
         "//mediapipe/framework/api2:builder",
         "//mediapipe/framework/api2:port",
+        "//mediapipe/framework/formats:classification_cc_proto",
         "//mediapipe/framework/formats:image",
         "//mediapipe/framework/formats:landmark_cc_proto",
         "//mediapipe/framework/formats:rect_cc_proto",
@@ -79,8 +106,39 @@ cc_library(
         "//mediapipe/tasks/cc/core:model_resources",
         "//mediapipe/tasks/cc/core:model_task_graph",
         "//mediapipe/tasks/cc/core:utils",
+        "//mediapipe/tasks/cc/vision/face_landmarker/proto:face_blendshapes_graph_options_cc_proto",
         "//mediapipe/tasks/cc/vision/face_landmarker/proto:face_landmarks_detector_graph_options_cc_proto",
+        "//mediapipe/tasks/cc/vision/face_landmarker/proto:tensors_to_face_landmarks_graph_options_cc_proto",
         "//mediapipe/tasks/cc/vision/utils:image_tensor_specs",
+        "//mediapipe/util:graph_builder_utils",
     ],
     alwayslink = 1,
+)
+
+cc_library(
+    name = "face_landmarker_result",
+    srcs = ["face_landmarker_result.cc"],
+    hdrs = ["face_landmarker_result.h"],
+    deps = [
+        "//mediapipe/framework/formats:classification_cc_proto",
+        "//mediapipe/framework/formats:landmark_cc_proto",
+        "//mediapipe/framework/formats:matrix",
+        "//mediapipe/framework/formats:matrix_data_cc_proto",
+        "//mediapipe/tasks/cc/components/containers:classification_result",
+        "//mediapipe/tasks/cc/components/containers:landmark",
+    ],
+)
+
+cc_library(
+    name = "face_landmarker_result_cc",
+    srcs = ["face_landmarker_result.cc"],
+    hdrs = ["face_landmarker_result.h"],
+    deps = [
+        "//mediapipe/framework/formats:classification_cc_proto",
+        "//mediapipe/framework/formats:landmark_cc_proto",
+        "//mediapipe/framework/formats:matrix",
+        "//mediapipe/framework/formats:matrix_data_cc_proto",
+        "//mediapipe/tasks/cc/components/containers:classification_result",
+        "//mediapipe/tasks/cc/components/containers:landmark",
+    ],
 )

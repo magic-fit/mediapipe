@@ -50,7 +50,6 @@ cc_library(
     name = "graph_support",
     hdrs = ["graph_support.h"],
     visibility = ["//visibility:public"],
-    deps = ["//mediapipe/framework:graph_service"],
 )
 
 cc_library(
@@ -460,7 +459,9 @@ cc_library(
         ":frame_buffer_view",
         ":gpu_buffer_format",
         ":gpu_buffer_storage",
+        ":image_frame_view",
         "//mediapipe/framework/formats:frame_buffer",
+        "//mediapipe/framework/formats:image_frame",
         "//mediapipe/framework/formats:yuv_image",
         "//third_party/libyuv",
         "@com_google_absl//absl/log",
@@ -519,10 +520,6 @@ objc_library(
         "-Wno-shorten-64-to-32",
     ],
     features = ["-layering_check"],
-    sdk_frameworks = [
-        "CoreVideo",
-        "Metal",
-    ],
     visibility = ["//visibility:public"],
     deps = [
         "//mediapipe/framework/port:ret_check",
@@ -829,6 +826,7 @@ objc_library(
     features = ["-layering_check"],
     visibility = ["//visibility:public"],
     deps = [
+        ":gpu_service",
         ":gpu_shared_data_internal",
         ":graph_support",
         "//mediapipe/objc:mediapipe_framework_ios",
@@ -1215,8 +1213,12 @@ mediapipe_cc_test(
         "ios",
     ],
     deps = [
+        ":gpu_buffer",
         ":gpu_buffer_format",
         ":gpu_buffer_storage_yuv_image",
+        "//mediapipe/framework/formats:image_frame",
+        "//mediapipe/framework/formats:yuv_image",
         "//mediapipe/framework/port:gtest_main",
+        "//third_party/libyuv",
     ],
 )
