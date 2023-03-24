@@ -1,5 +1,5 @@
-# proto-file: mediapipe/tasks/cc/vision/face_geometry/proto/environment.proto
-# proto-message: Environment
+# proto-file: mediapipe/tasks/cc/vision/face_geometry/proto/face_geometry.proto
+# proto-message: FaceGeometry
 mesh {
   vertex_type: VERTEX_PT
   primitive_type: TRIANGLE

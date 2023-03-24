@@ -22,6 +22,7 @@ load(
 load("//mediapipe/framework:mediapipe_cc_test.bzl", "mediapipe_cc_test")
 load("//mediapipe/framework:encode_binary_proto.bzl", "encode_binary_proto")
 load("@org_tensorflow//tensorflow/lite/core/shims:cc_library_with_tflite.bzl", "cc_library_with_tflite")
+load("//mediapipe/framework:more_selects.bzl", "more_selects")
 
 licenses(["notice"])
 
@@ -32,6 +33,27 @@ exports_files(
     visibility = [
         "//mediapipe/calculators/image:__subpackages__",
         "//mediapipe/util:__subpackages__",
+    ],
+)
+
+config_setting(
+    name = "disable_gpu",
+    define_values = {
+        "MEDIAPIPE_DISABLE_GPU": "1",
+    },
+    visibility = ["//visibility:public"],
+)
+
+more_selects.config_setting_negation(
+    name = "not_disable_gpu",
+    negate = ":disable_gpu",
+)
+
+selects.config_setting_group(
+    name = "platform_ios_with_gpu",
+    match_all = [
+        ":not_disable_gpu",
+        "//mediapipe:ios",
     ],
 )
 
@@ -581,11 +603,11 @@ cc_library(
 cc_library(
     name = "inference_calculator",
     deps = [
-        ":inference_calculator_interface",
         ":inference_calculator_cpu",
+        ":inference_calculator_interface",
     ] + select({
         "//conditions:default": [":inference_calculator_gl_if_compute_shader_available"],
-        "//mediapipe:ios": [":inference_calculator_metal"],
+        ":platform_ios_with_gpu": [":inference_calculator_metal"],
     }),
     alwayslink = 1,
 )
@@ -620,11 +642,11 @@ cc_library(
     deps = [
         ":tensor_converter_calculator_cc_proto",
         "//mediapipe/framework:calculator_framework",
+        "//mediapipe/framework:port",
         "//mediapipe/framework/formats:image_frame",
         "//mediapipe/framework/formats:matrix",
         "//mediapipe/framework/formats:tensor",
         "//mediapipe/framework/port:ret_check",
-        "//mediapipe/framework:port",
         "//mediapipe/util:resource_util",
     ] + select({
         "//mediapipe/gpu:disable_gpu": [],
@@ -642,16 +664,16 @@ cc_library(
             "//mediapipe/gpu:gpu_buffer",
         ],
         "//mediapipe:ios": [
-            "//mediapipe/gpu:MPPMetalUtil",
             "//mediapipe/gpu:MPPMetalHelper",
+            "//mediapipe/gpu:MPPMetalUtil",
             "//mediapipe/objc:mediapipe_framework_ios",
         ],
         "//mediapipe:macos": [],
         "//conditions:default": [
             "//mediapipe/gpu:gl_calculator_helper",
             "//mediapipe/gpu:gl_simple_shaders",
-            "//mediapipe/gpu:shader_util",
             "//mediapipe/gpu:gpu_buffer",
+            "//mediapipe/gpu:shader_util",
         ],
     }),
 )
@@ -706,16 +728,16 @@ cc_library(
     }),
     deps = [
         ":tensors_to_detections_calculator_cc_proto",
-        "//mediapipe/framework/formats:detection_cc_proto",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:span",
-        "//mediapipe/framework/api2:node",
-        "//mediapipe/framework/formats/object_detection:anchor_cc_proto",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework:port",
+        "//mediapipe/framework/api2:node",
         "//mediapipe/framework/deps:file_path",
+        "//mediapipe/framework/formats:detection_cc_proto",
         "//mediapipe/framework/formats:location",
         "//mediapipe/framework/formats:tensor",
+        "//mediapipe/framework/formats/object_detection:anchor_cc_proto",
         "//mediapipe/framework/port:ret_check",
     ] + selects.with_or({
         ":compute_shader_unavailable": [],
@@ -729,8 +751,8 @@ cc_library(
     visibility = ["//visibility:private"],
     deps = select({
         "//mediapipe:ios": [
-            "//mediapipe/gpu:MPPMetalUtil",
             "//mediapipe/gpu:MPPMetalHelper",
+            "//mediapipe/gpu:MPPMetalUtil",
         ],
         "//mediapipe:macos": [],
         "//conditions:default": [
@@ -879,12 +901,12 @@ cc_library(
         "@com_google_absl//absl/container:node_hash_map",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:span",
+        "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/api2:node",
         "//mediapipe/framework/formats:classification_cc_proto",
-        "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/formats:location",
-        "//mediapipe/framework/port:ret_check",
         "//mediapipe/framework/formats:tensor",
+        "//mediapipe/framework/port:ret_check",
         "//mediapipe/util:label_map_cc_proto",
         "//mediapipe/util:resource_util",
     ] + select({
@@ -946,6 +968,8 @@ cc_library(
         ":image_to_tensor_converter",
         ":image_to_tensor_utils",
         ":loose_headers",
+        "//mediapipe/framework:calculator_framework",
+        "//mediapipe/framework:port",
         "//mediapipe/framework/api2:node",
         "//mediapipe/framework/formats:image",
         "//mediapipe/framework/formats:image_frame",
@@ -954,8 +978,6 @@ cc_library(
         "//mediapipe/framework/port:ret_check",
         "//mediapipe/framework/port:status",
         "//mediapipe/framework/port:statusor",
-        "//mediapipe/framework:calculator_framework",
-        "//mediapipe/framework:port",
         "//mediapipe/gpu:gpu_origin_cc_proto",
     ] + select({
         "//mediapipe/gpu:disable_gpu": [],
@@ -975,17 +997,20 @@ cc_library(
             ":image_to_tensor_converter_gl_buffer",
             "//mediapipe/gpu:gl_calculator_helper",
             "//mediapipe/gpu:gpu_buffer",
+            "//mediapipe/gpu:gpu_service",
         ],
         "//mediapipe:apple": [
             ":image_to_tensor_converter_metal",
             "//mediapipe/gpu:gl_calculator_helper",
             "//mediapipe/gpu:MPPMetalHelper",
             "//mediapipe/gpu:gpu_buffer",
+            "//mediapipe/gpu:gpu_service",
         ],
         "//conditions:default": [
             ":image_to_tensor_converter_gl_buffer",
             "//mediapipe/gpu:gl_calculator_helper",
             "//mediapipe/gpu:gpu_buffer",
+            "//mediapipe/gpu:gpu_service",
         ],
     }),
 )
@@ -1023,6 +1048,10 @@ cc_test(
         ":image_to_tensor_calculator",
         ":image_to_tensor_converter",
         ":image_to_tensor_utils",
+        "@com_google_absl//absl/flags:flag",
+        "@com_google_absl//absl/memory",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework:calculator_runner",
         "//mediapipe/framework/deps:file_path",
@@ -1039,11 +1068,10 @@ cc_test(
         "//mediapipe/framework/port:opencv_imgproc",
         "//mediapipe/framework/port:parse_text_proto",
         "//mediapipe/util:image_test_utils",
-        "@com_google_absl//absl/flags:flag",
-        "@com_google_absl//absl/memory",
-        "@com_google_absl//absl/strings",
-        "@com_google_absl//absl/strings:str_format",
-    ],
+    ] + select({
+        "//mediapipe:apple": [],
+        "//conditions:default": ["//mediapipe/gpu:gl_context"],
+    }),
 )
 
 cc_library(
@@ -1137,13 +1165,13 @@ cc_library(
             ":image_to_tensor_utils",
             "@com_google_absl//absl/strings",
             "//mediapipe/framework:calculator_framework",
+            "//mediapipe/framework/formats:image",
             "//mediapipe/framework/formats:tensor",
             "//mediapipe/framework/port:ret_check",
             "//mediapipe/framework/port:status",
             "//mediapipe/framework/port:statusor",
             "//mediapipe/gpu:gl_calculator_helper",
             "//mediapipe/gpu:gl_simple_shaders",
-            "//mediapipe/framework/formats:image",
             "//mediapipe/gpu:shader_util",
         ],
     }),
@@ -1157,10 +1185,10 @@ cc_library(
     deps = ["//mediapipe/framework:port"] + select({
         "//mediapipe/gpu:disable_gpu": [],
         "//conditions:default": [
-            "//mediapipe/gpu:gl_base",
-            "//mediapipe/gpu:gl_context",
             "//mediapipe/framework/port:status",
             "//mediapipe/framework/port:statusor",
+            "//mediapipe/gpu:gl_base",
+            "//mediapipe/gpu:gl_context",
         ],
     }),
 )
@@ -1191,11 +1219,11 @@ cc_library(
             "//mediapipe/gpu:MPPMetalHelper",
             "@com_google_absl//absl/strings",
             "//mediapipe/framework:calculator_framework",
+            "//mediapipe/framework/formats:image",
             "//mediapipe/framework/formats:tensor",
             "//mediapipe/framework/port:ret_check",
             "//mediapipe/framework/port:status",
             "//mediapipe/framework/port:statusor",
-            "//mediapipe/framework/formats:image",
             "//mediapipe/gpu:gpu_buffer_format",
             "@org_tensorflow//tensorflow/lite/delegates/gpu/common:shape",
             "@org_tensorflow//tensorflow/lite/delegates/gpu/common:types",
@@ -1276,20 +1304,20 @@ cc_library(
     }),
     deps = [
         ":tensors_to_segmentation_calculator_cc_proto",
-        "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:span",
+        "//mediapipe/framework:calculator_context",
+        "//mediapipe/framework:calculator_framework",
+        "//mediapipe/framework:port",
         "//mediapipe/framework/formats:image",
         "//mediapipe/framework/formats:image_frame",
         "//mediapipe/framework/formats:tensor",
         "//mediapipe/framework/port:ret_check",
-        "//mediapipe/framework:calculator_context",
-        "//mediapipe/framework:calculator_framework",
-        "//mediapipe/framework:port",
+        "//mediapipe/framework/port:statusor",
         "//mediapipe/gpu:gpu_origin_cc_proto",
         "//mediapipe/util:resource_util",
         "@org_tensorflow//tensorflow/lite:framework",
-        "//mediapipe/framework/port:statusor",
     ] + selects.with_or({
         "//mediapipe/gpu:disable_gpu": [],
         "//conditions:default": [

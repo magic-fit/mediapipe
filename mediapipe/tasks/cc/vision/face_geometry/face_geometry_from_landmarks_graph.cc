@@ -28,6 +28,7 @@ limitations under the License.
 #include "mediapipe/tasks/cc/vision/face_geometry/calculators/geometry_pipeline_calculator.pb.h"
 #include "mediapipe/tasks/cc/vision/face_geometry/proto/environment.pb.h"
 #include "mediapipe/tasks/cc/vision/face_geometry/proto/face_geometry.pb.h"
+#include "mediapipe/tasks/cc/vision/face_geometry/proto/face_geometry_graph_options.pb.h"
 #include "mediapipe/util/graph_builder_utils.h"
 
 namespace mediapipe::tasks::vision::face_geometry {
@@ -48,10 +49,6 @@ constexpr char kEnvironmentTag[] = "ENVIRONMENT";
 constexpr char kIterableTag[] = "ITERABLE";
 constexpr char kBatchEndTag[] = "BATCH_END";
 constexpr char kItemTag[] = "ITEM";
-
-constexpr char kGeometryPipelineMetadataPath[] =
-    "mediapipe/tasks/cc/vision/face_geometry/data/"
-    "geometry_pipeline_metadata_landmarks.binarypb";
 
 struct FaceGeometryOuts {
   Stream<std::vector<FaceGeometry>> multi_face_geometry;
@@ -97,7 +94,8 @@ void ConfigureFaceGeometryEnvGeneratorCalculator(
 //  SideInputs:
 //   ENVIRONMENT - ENVIRONMENT
 //     Environment that describes the current virtual scene. If not provided, a
-//     default environment will be used which can be applied to common webcam.
+//     default environment will be used which is good enough for most general
+//     use cases.
 //
 //
 // Outputs:
@@ -126,6 +124,7 @@ class FaceGeometryFromLandmarksGraph : public Subgraph {
     }
     ASSIGN_OR_RETURN(auto outs,
                      BuildFaceGeometryFromLandmarksGraph(
+                         *sc->MutableOptions<proto::FaceGeometryGraphOptions>(),
                          graph.In(kFaceLandmarksTag)
                              .Cast<std::vector<NormalizedLandmarkList>>(),
                          graph.In(kImageSizeTag).Cast<std::pair<int, int>>(),
@@ -137,12 +136,13 @@ class FaceGeometryFromLandmarksGraph : public Subgraph {
 
  private:
   absl::StatusOr<FaceGeometryOuts> BuildFaceGeometryFromLandmarksGraph(
+      proto::FaceGeometryGraphOptions& graph_options,
       Stream<std::vector<NormalizedLandmarkList>> multi_face_landmarks,
       Stream<std::pair<int, int>> image_size,
       std::optional<SidePacket<Environment>> environment, Graph& graph) {
     if (!environment.has_value()) {
       // If there is no provided Environment, use a a default environment which
-      // is good enough for most general use case.
+      // is good enough for most general use cases.
       auto& env_generator = graph.AddNode(
           "mediapipe.tasks.vision.face_geometry."
           "FaceGeometryEnvGeneratorCalculator");
@@ -184,7 +184,8 @@ class FaceGeometryFromLandmarksGraph : public Subgraph {
         "mediapipe.tasks.vision.face_geometry.FaceGeometryPipelineCalculator");
     auto& geometry_pipeline_options =
         geometry_pipeline.GetOptions<FaceGeometryPipelineCalculatorOptions>();
-    geometry_pipeline_options.set_metadata_path(kGeometryPipelineMetadataPath);
+    geometry_pipeline_options.Swap(
+        graph_options.mutable_geometry_pipeline_options());
     image_size >> geometry_pipeline.In(kImageSizeTag);
     multi_face_landmarks_no_iris >>
         geometry_pipeline.In(kMultiFaceLandmarksTag);
