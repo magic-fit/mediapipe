@@ -501,11 +501,6 @@ public class ExternalTextureConverter implements TextureFrameProducer {
 
     private PoolTextureFrame createFrame() {
       int destinationTextureId = ShaderUtil.createRgbaTexture(destinationWidth, destinationHeight);
-      Log.d(
-          TAG,
-          String.format(
-              "Created output texture: %d width: %d height: %d",
-              destinationTextureId, destinationWidth, destinationHeight));
       bindFramebuffer(destinationTextureId, destinationWidth, destinationHeight);
       return new PoolTextureFrame(destinationTextureId, destinationWidth, destinationHeight);
     }
