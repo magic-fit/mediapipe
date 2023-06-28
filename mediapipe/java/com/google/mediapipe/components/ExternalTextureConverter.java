@@ -45,6 +45,8 @@ public class ExternalTextureConverter implements TextureFrameProducer {
   private RenderThread thread;
   private Throwable startupException = null;
 
+  private ErrorListener errorListener = null;
+
   /**
    * Creates the ExternalTextureConverter to create a working copy of each camera frame.
    *
@@ -92,15 +94,25 @@ public class ExternalTextureConverter implements TextureFrameProducer {
       // error, and throw a RuntimeException.
       Thread.currentThread().interrupt();
       Log.e(TAG, "thread was unexpectedly interrupted: " + ie.getMessage());
-      throw new RuntimeException(ie);
+
+      if(this.errorListener != null) {
+        errorListener.onError(new RuntimeException(ie));
+      }
     }
 
     // Rethrow initialization exception.
     thread.setUncaughtExceptionHandler(null);
     if (startupException != null) {
       thread.quitSafely();
-      throw new RuntimeException(startupException);
+
+      if(this.errorListener != null) {
+        errorListener.onError(new RuntimeException(startupException));
+      }
     }
+  }
+
+  public void setErrorListener(ErrorListener listener) {
+    this.errorListener = listener;
   }
 
   /**
