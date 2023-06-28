@@ -55,6 +55,13 @@ public class ExternalTextureConverter implements TextureFrameProducer {
   public ExternalTextureConverter(EGLContext parentContext, int numBuffers) {
     thread = makeRenderThread(parentContext, numBuffers);
     thread.setName(THREAD_NAME);
+    thread.setErrorListener(new ErrorListener() {
+      public void onError(Exception e) {
+        if(ExternalTextureConverter.this.errorListener != null) {
+          ExternalTextureConverter.this.errorListener.onError(e);
+        }
+      }
+    });
 
     // Catch exceptions raised during initialization. The user has not had a chance
     // to set an exception handler yet.
@@ -327,6 +334,8 @@ public class ExternalTextureConverter implements TextureFrameProducer {
     protected int destinationWidth = 0;
     protected int destinationHeight = 0;
 
+    private ErrorListener errorListener = null;
+
     private class PoolTextureFrame extends AppTextureFrame {
       public PoolTextureFrame(int textureName, int width, int height) {
         super(textureName, width, height);
@@ -350,6 +359,10 @@ public class ExternalTextureConverter implements TextureFrameProducer {
       bufferPoolSize = numBuffers;
       renderer = new ExternalTextureRenderer();
       consumers = new ArrayList<>();
+    }
+
+    public void setErrorListener(ErrorListener listener) {
+      this.errorListener = listener;
     }
 
     public void setBufferPoolSize(int bufferPoolSize) {
@@ -387,10 +400,17 @@ public class ExternalTextureConverter implements TextureFrameProducer {
 
     public void setSurfaceTextureAndAttachToGLContext(
         SurfaceTexture texture, int width, int height) {
-      setSurfaceTexture(texture, width, height);
-      int[] textures = new int[1];
-      GLES20.glGenTextures(1, textures, 0);
-      surfaceTexture.attachToGLContext(textures[0]);
+
+      try {
+        setSurfaceTexture(texture, width, height);
+        int[] textures = new int[1];
+        GLES20.glGenTextures(1, textures, 0);
+        surfaceTexture.attachToGLContext(textures[0]);
+      } catch (Exception e) {
+        if(this.errorListener != null) {
+          errorListener.onError(e);
+        }
+      }
     }
 
     public void setConsumer(TextureFrameConsumer consumer) {
