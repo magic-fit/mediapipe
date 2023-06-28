@@ -1,5 +1,5 @@
 package com.google.mediapipe.components;
 
-interface ErrorListener {
+public interface ErrorListener {
     public void onError(Exception e);
 }
