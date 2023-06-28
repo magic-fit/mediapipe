@@ -14,6 +14,7 @@
 
 #include "mediapipe/gpu/gpu_shared_data_internal.h"
 
+#include "absl/base/attributes.h"
 #include "mediapipe/framework/deps/no_destructor.h"
 #include "mediapipe/framework/port/ret_check.h"
 #include "mediapipe/gpu/gl_context.h"
@@ -116,10 +117,10 @@ GpuResources::~GpuResources() {
 #endif  // __APPLE__
 }
 
-extern const GraphService<GpuResources> kGpuService;
+ABSL_CONST_INIT extern const GraphService<GpuResources> kGpuService;
 
 absl::Status GpuResources::PrepareGpuNode(CalculatorNode* node) {
-  CHECK(ContainsKey(node->Contract().ServiceRequests(), kGpuService.key));
+  CHECK(node->Contract().ServiceRequests().contains(kGpuService.key));
   std::string node_id = node->GetCalculatorState().NodeName();
   std::string node_type = node->GetCalculatorState().CalculatorType();
   std::string context_key;

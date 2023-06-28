@@ -1,5 +1,6 @@
 // Placeholder for internal dependency on assertTruthy
 // Placeholder for internal dependency on jsloader
+import {isWebKit} from '../../web/graph_runner/platform_utils';
 // Placeholder for internal dependency on trusted resource url
 
 // This file can serve as a common interface for most simple TypeScript
@@ -13,6 +14,7 @@
  */
 export declare interface FileLocator {
   locateFile: (filename: string) => string;
+  mainScriptUrlOrBlob?: string;
 }
 
 /**
@@ -57,10 +59,19 @@ export declare interface WasmModule {
   HEAPU32: Uint32Array;
   HEAPF32: Float32Array;
   HEAPF64: Float64Array;
+  FS_createDataFile:
+      (parent: string, name: string, data: Uint8Array, canRead: boolean,
+       canWrite: boolean, canOwn: boolean) => void;
+  FS_createPath:
+      (parent: string, name: string, canRead: boolean,
+       canWrite: boolean) => void;
+  FS_unlink(path: string): void;
+
   errorListener?: ErrorListener;
   _bindTextureToCanvas: () => boolean;
   _changeBinaryGraph: (size: number, dataPtr: number) => void;
   _changeTextGraph: (size: number, dataPtr: number) => void;
+  _closeGraph: () => void;
   _free: (ptr: number) => void;
   _malloc: (size: number) => number;
   _processFrame: (width: number, height: number, timestamp: number) => void;
@@ -216,13 +227,15 @@ export class GraphRunner {
 
     if (glCanvas !== undefined) {
       this.wasmModule.canvas = glCanvas;
-    } else if (typeof OffscreenCanvas !== 'undefined') {
+    } else if (typeof OffscreenCanvas !== 'undefined' && !isWebKit()) {
       // If no canvas is provided, assume Chrome/Firefox and just make an
-      // OffscreenCanvas for GPU processing.
+      // OffscreenCanvas for GPU processing. Note that we exclude Safari
+      // since it does not (yet) support WebGL for OffscreenCanvas.
       this.wasmModule.canvas = new OffscreenCanvas(1, 1);
     } else {
-      console.warn('OffscreenCanvas not detected and GraphRunner constructor '
-                 + 'glCanvas parameter is undefined. Creating backup canvas.');
+      console.warn(
+          'OffscreenCanvas not supported and GraphRunner constructor ' +
+          'glCanvas parameter is undefined. Creating backup canvas.');
       this.wasmModule.canvas = document.createElement('canvas');
     }
   }
@@ -704,8 +717,8 @@ export class GraphRunner {
    *     given timestamp, to be parsed into the specified protobuffer type.
    * @param data The binary (serialized) raw protobuffer data.
    * @param protoType The C++ namespaced type this protobuffer data corresponds
-   *     to. It will be converted to this type when output as a packet into the
-   *     graph.
+   *     to (e.g. "foo.Bar"). It will be converted to this type when output as a
+   *     packet into the graph.
    * @param streamName The name of the graph input stream to send data into.
    * @param timestamp The timestamp of the input data, in ms.
    */
@@ -1144,6 +1157,16 @@ export class GraphRunner {
   finishProcessing(): void {
     this.wasmModule._waitUntilIdle();
   }
+
+  /**
+   * Closes the input streams and all calculators for this graph and frees up
+   * any C++ resources. The graph will not be usable once closed.
+   */
+  closeGraph(): void {
+    this.wasmModule._closeGraph();
+    this.wasmModule.simpleListeners = undefined;
+    this.wasmModule.emptyPacketListeners = undefined;
+  }
 }
 
 // Quick private helper to run the given script safely
@@ -1214,10 +1237,21 @@ export async function createMediaPipeLib<LibType>(
   if (!self.ModuleFactory) {
     throw new Error('ModuleFactory not set.');
   }
+
+  // Until asset scripts work nicely with MODULARIZE, when we are given both
+  // self.Module and a fileLocator, we manually merge them into self.Module and
+  // use that. TODO: Remove this when asset scripts are fixed.
+  if (self.Module && fileLocator) {
+    const moduleFileLocator = self.Module as FileLocator;
+    moduleFileLocator.locateFile = fileLocator.locateFile;
+    if (fileLocator.mainScriptUrlOrBlob) {
+      moduleFileLocator.mainScriptUrlOrBlob = fileLocator.mainScriptUrlOrBlob;
+    }
+  }
   // TODO: Ensure that fileLocator is passed in by all users
   // and make it required
   const module =
-      await self.ModuleFactory(fileLocator || self.Module as FileLocator);
+      await self.ModuleFactory(self.Module as FileLocator || fileLocator);
   // Don't reuse factory or module seed
   self.ModuleFactory = self.Module = undefined;
   return new constructorFcn(module, glCanvas);

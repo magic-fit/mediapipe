@@ -1,4 +1,4 @@
-# Copyright 2023 The MediaPipe Authors. All Rights Reserved.
+# Copyright 2023 The MediaPipe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -22,23 +22,29 @@ cc_library(
     name = "interactive_segmenter",
     srcs = ["interactive_segmenter.cc"],
     hdrs = ["interactive_segmenter.h"],
+    visibility = ["//visibility:public"],
     deps = [
         ":interactive_segmenter_graph",
+        "//mediapipe/framework:calculator_cc_proto",
         "//mediapipe/framework/api2:builder",
         "//mediapipe/framework/formats:image",
         "//mediapipe/framework/formats:rect_cc_proto",
+        "//mediapipe/tasks/cc:common",
         "//mediapipe/tasks/cc/components/containers:keypoint",
         "//mediapipe/tasks/cc/core:base_options",
         "//mediapipe/tasks/cc/vision/core:base_vision_task_api",
         "//mediapipe/tasks/cc/vision/core:image_processing_options",
         "//mediapipe/tasks/cc/vision/core:running_mode",
         "//mediapipe/tasks/cc/vision/core:vision_task_api_factory",
+        "//mediapipe/tasks/cc/vision/image_segmenter:image_segmenter_result",
         "//mediapipe/tasks/cc/vision/image_segmenter/proto:image_segmenter_graph_options_cc_proto",
         "//mediapipe/tasks/cc/vision/image_segmenter/proto:segmenter_options_cc_proto",
         "//mediapipe/util:color_cc_proto",
         "//mediapipe/util:render_data_cc_proto",
         "@com_google_absl//absl/status",
         "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
+        "@com_google_absl//absl/types:optional",
     ],
 )
 
@@ -46,7 +52,7 @@ cc_library(
     name = "interactive_segmenter_graph",
     srcs = ["interactive_segmenter_graph.cc"],
     deps = [
-        "@com_google_absl//absl/strings",
+        "//mediapipe/calculators/image:image_transformation_calculator",
         "//mediapipe/calculators/image:set_alpha_calculator",
         "//mediapipe/calculators/util:annotation_overlay_calculator",
         "//mediapipe/calculators/util:flat_color_image_calculator",
@@ -55,6 +61,7 @@ cc_library(
         "//mediapipe/calculators/util:to_image_calculator",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/api2:builder",
+        "//mediapipe/framework/api2:node",
         "//mediapipe/framework/api2:port",
         "//mediapipe/framework/formats:image",
         "//mediapipe/framework/formats:rect_cc_proto",
@@ -62,9 +69,13 @@ cc_library(
         "//mediapipe/tasks/cc/core:model_task_graph",
         "//mediapipe/tasks/cc/vision/image_segmenter:image_segmenter_graph",
         "//mediapipe/tasks/cc/vision/image_segmenter/proto:image_segmenter_graph_options_cc_proto",
+        "//mediapipe/tasks/cc/vision/image_segmenter/proto:segmenter_options_cc_proto",
         "//mediapipe/util:color_cc_proto",
+        "//mediapipe/util:graph_builder_utils",
         "//mediapipe/util:label_map_cc_proto",
         "//mediapipe/util:render_data_cc_proto",
+        "@com_google_absl//absl/status:statusor",
+        "@com_google_absl//absl/strings",
     ] + select({
         "//mediapipe/gpu:disable_gpu": [],
         "//conditions:default": [

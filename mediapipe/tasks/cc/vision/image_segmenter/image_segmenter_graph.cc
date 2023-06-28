@@ -1,4 +1,4 @@
-/* Copyright 2022 The MediaPipe Authors. All Rights Reserved.
+/* Copyright 2022 The MediaPipe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -13,7 +13,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <type_traits>
 #include <vector>
 
@@ -22,6 +24,7 @@ limitations under the License.
 #include "absl/strings/str_format.h"
 #include "mediapipe/calculators/image/image_clone_calculator.pb.h"
 #include "mediapipe/calculators/image/image_transformation_calculator.pb.h"
+#include "mediapipe/calculators/image/set_alpha_calculator.pb.h"
 #include "mediapipe/calculators/tensor/tensor_converter_calculator.pb.h"
 #include "mediapipe/framework/api2/builder.h"
 #include "mediapipe/framework/api2/port.h"
@@ -42,6 +45,7 @@ limitations under the License.
 #include "mediapipe/tasks/cc/vision/utils/image_tensor_specs.h"
 #include "mediapipe/tasks/metadata/image_segmenter_metadata_schema_generated.h"
 #include "mediapipe/tasks/metadata/metadata_schema_generated.h"
+#include "mediapipe/util/graph_builder_utils.h"
 #include "mediapipe/util/label_map.pb.h"
 #include "mediapipe/util/label_map_util.h"
 #include "tensorflow/lite/schema/schema_generated.h"
@@ -65,23 +69,30 @@ using ::mediapipe::tasks::vision::image_segmenter::proto::
     ImageSegmenterGraphOptions;
 using ::mediapipe::tasks::vision::image_segmenter::proto::SegmenterOptions;
 using ::tflite::TensorMetadata;
-using LabelItems = mediapipe::proto_ns::Map<int64, ::mediapipe::LabelMapItem>;
+using LabelItems = mediapipe::proto_ns::Map<int64_t, ::mediapipe::LabelMapItem>;
 
 constexpr char kSegmentationTag[] = "SEGMENTATION";
 constexpr char kGroupedSegmentationTag[] = "GROUPED_SEGMENTATION";
+constexpr char kConfidenceMaskTag[] = "CONFIDENCE_MASK";
+constexpr char kConfidenceMasksTag[] = "CONFIDENCE_MASKS";
+constexpr char kCategoryMaskTag[] = "CATEGORY_MASK";
 constexpr char kImageTag[] = "IMAGE";
 constexpr char kImageCpuTag[] = "IMAGE_CPU";
 constexpr char kImageGpuTag[] = "IMAGE_GPU";
 constexpr char kNormRectTag[] = "NORM_RECT";
 constexpr char kTensorsTag[] = "TENSORS";
 constexpr char kOutputSizeTag[] = "OUTPUT_SIZE";
+constexpr char kQualityScoresTag[] = "QUALITY_SCORES";
 constexpr char kSegmentationMetadataName[] = "SEGMENTER_METADATA";
 
 // Struct holding the different output streams produced by the image segmenter
 // subgraph.
 struct ImageSegmenterOutputs {
-  std::vector<Source<Image>> segmented_masks;
+  std::optional<std::vector<Source<Image>>> segmented_masks;
+  std::optional<std::vector<Source<Image>>> confidence_masks;
+  std::optional<Source<Image>> category_mask;
   // The same as the input image, mainly used for live stream mode.
+  std::optional<Source<std::vector<float>>> quality_scores;
   Source<Image> image;
 };
 
@@ -95,8 +106,10 @@ struct ImageAndTensorsOnDevice {
 }  // namespace
 
 absl::Status SanityCheckOptions(const ImageSegmenterGraphOptions& options) {
-  if (options.segmenter_options().output_type() ==
-      SegmenterOptions::UNSPECIFIED) {
+  // TODO: remove deprecated output type support.
+  if (options.segmenter_options().has_output_type() &&
+      options.segmenter_options().output_type() ==
+          SegmenterOptions::UNSPECIFIED) {
     return CreateStatusWithPayload(absl::StatusCode::kInvalidArgument,
                                    "`output_type` must not be UNSPECIFIED",
                                    MediaPipeTasksStatus::kInvalidArgumentError);
@@ -133,9 +146,8 @@ absl::Status ConfigureTensorsToSegmentationCalculator(
     const core::ModelResources& model_resources,
     TensorsToSegmentationCalculatorOptions* options) {
   // Set default activation function NONE
-  options->mutable_segmenter_options()->set_output_type(
-      segmenter_option.segmenter_options().output_type());
-  options->mutable_segmenter_options()->set_activation(SegmenterOptions::NONE);
+  options->mutable_segmenter_options()->CopyFrom(
+      segmenter_option.segmenter_options());
   // Find the custom metadata of ImageSegmenterOptions type in model metadata.
   const auto* metadata_extractor = model_resources.GetMetadataExtractor();
   bool found_activation_in_metadata = false;
@@ -182,19 +194,12 @@ absl::Status ConfigureTensorsToSegmentationCalculator(
         "Segmentation tflite models are assumed to have a single subgraph.",
         MediaPipeTasksStatus::kInvalidArgumentError);
   }
-  const auto* primary_subgraph = (*model.subgraphs())[0];
-  if (primary_subgraph->outputs()->size() != 1) {
-    return CreateStatusWithPayload(
-        absl::StatusCode::kInvalidArgument,
-        "Segmentation tflite models are assumed to have a single output.",
-        MediaPipeTasksStatus::kInvalidArgumentError);
-  }
-
   ASSIGN_OR_RETURN(
       *options->mutable_label_items(),
-      GetLabelItemsIfAny(*metadata_extractor,
-                         *metadata_extractor->GetOutputTensorMetadata()->Get(0),
-                         segmenter_option.display_names_locale()));
+      GetLabelItemsIfAny(
+          *metadata_extractor,
+          **metadata_extractor->GetOutputTensorMetadata()->crbegin(),
+          segmenter_option.display_names_locale()));
   return absl::OkStatus();
 }
 
@@ -204,8 +209,14 @@ absl::StatusOr<const tflite::Tensor*> GetOutputTensor(
   const tflite::Model& model = *model_resources.GetTfLiteModel();
   const auto* primary_subgraph = (*model.subgraphs())[0];
   const auto* output_tensor =
-      (*primary_subgraph->tensors())[(*primary_subgraph->outputs())[0]];
+      (*primary_subgraph->tensors())[*(*primary_subgraph->outputs()).rbegin()];
   return output_tensor;
+}
+
+uint32_t GetOutputTensorsSize(const core::ModelResources& model_resources) {
+  const tflite::Model& model = *model_resources.GetTfLiteModel();
+  const auto* primary_subgraph = (*model.subgraphs())[0];
+  return primary_subgraph->outputs()->size();
 }
 
 // Get the input tensor from the tflite model of given model resources.
@@ -241,7 +252,8 @@ void ConfigureTensorConverterCalculator(
 // the tflite model.
 absl::StatusOr<ImageAndTensorsOnDevice> ConvertImageToTensors(
     Source<Image> image_in, Source<NormalizedRect> norm_rect_in, bool use_gpu,
-    const core::ModelResources& model_resources, Graph& graph) {
+    bool is_hair_segmentation, const core::ModelResources& model_resources,
+    Graph& graph) {
   ASSIGN_OR_RETURN(const tflite::Tensor* tflite_input_tensor,
                    GetInputTensor(model_resources));
   if (tflite_input_tensor->shape()->size() != 4) {
@@ -286,8 +298,16 @@ absl::StatusOr<ImageAndTensorsOnDevice> ConvertImageToTensors(
     // Convert from Image to legacy ImageFrame or GpuBuffer.
     auto& from_image = graph.AddNode("FromImageCalculator");
     image_on_device >> from_image.In(kImageTag);
-    auto image_cpu_or_gpu =
+    Source<api2::AnyType> image_cpu_or_gpu =
         from_image.Out(use_gpu ? kImageGpuTag : kImageCpuTag);
+
+    if (is_hair_segmentation) {
+      auto& set_alpha = graph.AddNode("SetAlphaCalculator");
+      set_alpha.GetOptions<mediapipe::SetAlphaCalculatorOptions>()
+          .set_alpha_value(0);
+      image_cpu_or_gpu >> set_alpha.In(use_gpu ? kImageGpuTag : kImageTag);
+      image_cpu_or_gpu = set_alpha.Out(use_gpu ? kImageGpuTag : kImageTag);
+    }
 
     // Resize the input image to the model input size.
     auto& image_transformation = graph.AddNode("ImageTransformationCalculator");
@@ -317,12 +337,16 @@ absl::StatusOr<ImageAndTensorsOnDevice> ConvertImageToTensors(
   }
 }
 
-// An "mediapipe.tasks.vision.ImageSegmenterGraph" performs semantic
-// segmentation.
-// Two kinds of outputs are provided: SEGMENTATION and GROUPED_SEGMENTATION.
-// Users can retrieve segmented mask of only particular category/channel from
-// SEGMENTATION, and users can also get all segmented masks from
-// GROUPED_SEGMENTATION.
+// An "mediapipe.tasks.vision.image_segmenter.ImageSegmenterGraph" performs
+// semantic segmentation. The graph can output optional confidence masks if
+// CONFIDENCE_MASKS is connected, and an optional category mask if CATEGORY_MASK
+// is connected. At least one of CONFIDENCE_MASK, CONFIDENCE_MASKS and
+// CATEGORY_MASK must be connected.
+//
+//  Two kinds of outputs for confidence mask are provided: CONFIDENCE_MASK and
+//  CONFIDENCE_MASKS. Users can retrieve segmented mask of only particular
+//  category/channel from CONFIDENCE_MASK, and users can also get all segmented
+//  confidence masks from CONFIDENCE_MASKS.
 // - Accepts CPU input images and outputs segmented masks on CPU.
 //
 // Inputs:
@@ -334,17 +358,19 @@ absl::StatusOr<ImageAndTensorsOnDevice> ConvertImageToTensors(
 //     @Optional: rect covering the whole image is used if not specified.
 //
 // Outputs:
-//   SEGMENTATION - mediapipe::Image @Multiple
-//     Segmented masks for individual category. Segmented mask of single
+//   CONFIDENCE_MASK - mediapipe::Image @Multiple
+//     Confidence masks for individual category. Confidence mask of single
 //     category can be accessed by index based output stream.
-//   GROUPED_SEGMENTATION - std::vector<mediapipe::Image>
-//     The output segmented masks grouped in a vector.
+//   CONFIDENCE_MASKS - std::vector<mediapipe::Image> @Optional
+//     The output confidence masks grouped in a vector.
+//   CATEGORY_MASK - mediapipe::Image @Optional
+//     Optional Category mask.
 //   IMAGE - mediapipe::Image
 //     The image that image segmenter runs on.
 //
 // Example:
 // node {
-//   calculator: "mediapipe.tasks.vision.ImageSegmenterGraph"
+//   calculator: "mediapipe.tasks.vision.image_segmenter.ImageSegmenterGraph"
 //   input_stream: "IMAGE:image"
 //   output_stream: "SEGMENTATION:segmented_masks"
 //   options {
@@ -369,28 +395,68 @@ class ImageSegmenterGraph : public core::ModelTaskGraph {
     ASSIGN_OR_RETURN(const auto* model_resources,
                      CreateModelResources<ImageSegmenterGraphOptions>(sc));
     Graph graph;
+    const auto& options = sc->Options<ImageSegmenterGraphOptions>();
+    // TODO: remove deprecated output type support.
+    if (!options.segmenter_options().has_output_type()) {
+      MP_RETURN_IF_ERROR(SanityCheck(sc));
+    }
     ASSIGN_OR_RETURN(
         auto output_streams,
         BuildSegmentationTask(
-            sc->Options<ImageSegmenterGraphOptions>(), *model_resources,
-            graph[Input<Image>(kImageTag)],
+            options, *model_resources, graph[Input<Image>(kImageTag)],
             graph[Input<NormalizedRect>::Optional(kNormRectTag)], graph));
 
-    auto& merge_images_to_vector =
-        graph.AddNode("MergeImagesToVectorCalculator");
-    for (int i = 0; i < output_streams.segmented_masks.size(); ++i) {
-      output_streams.segmented_masks[i] >>
-          merge_images_to_vector[Input<Image>::Multiple("")][i];
-      output_streams.segmented_masks[i] >>
-          graph[Output<Image>::Multiple(kSegmentationTag)][i];
+    // TODO: remove deprecated output type support.
+    if (options.segmenter_options().has_output_type()) {
+      auto& merge_images_to_vector =
+          graph.AddNode("MergeImagesToVectorCalculator");
+      for (int i = 0; i < output_streams.segmented_masks->size(); ++i) {
+        output_streams.segmented_masks->at(i) >>
+            merge_images_to_vector[Input<Image>::Multiple("")][i];
+        output_streams.segmented_masks->at(i) >>
+            graph[Output<Image>::Multiple(kSegmentationTag)][i];
+      }
+      merge_images_to_vector.Out("") >>
+          graph[Output<std::vector<Image>>(kGroupedSegmentationTag)];
+    } else {
+      if (output_streams.confidence_masks) {
+        auto& merge_images_to_vector =
+            graph.AddNode("MergeImagesToVectorCalculator");
+        for (int i = 0; i < output_streams.confidence_masks->size(); ++i) {
+          output_streams.confidence_masks->at(i) >>
+              merge_images_to_vector[Input<Image>::Multiple("")][i];
+          output_streams.confidence_masks->at(i) >>
+              graph[Output<Image>::Multiple(kConfidenceMaskTag)][i];
+        }
+        merge_images_to_vector.Out("") >>
+            graph[Output<std::vector<Image>>::Optional(kConfidenceMasksTag)];
+      }
+      if (output_streams.category_mask) {
+        *output_streams.category_mask >> graph[Output<Image>(kCategoryMaskTag)];
+      }
     }
-    merge_images_to_vector.Out("") >>
-        graph[Output<std::vector<Image>>(kGroupedSegmentationTag)];
+    if (output_streams.quality_scores) {
+      *output_streams.quality_scores >>
+          graph[Output<std::vector<float>>::Optional(kQualityScoresTag)];
+    }
     output_streams.image >> graph[Output<Image>(kImageTag)];
     return graph.GetConfig();
   }
 
  private:
+  absl::Status SanityCheck(mediapipe::SubgraphContext* sc) {
+    const auto& node = sc->OriginalNode();
+    output_confidence_masks_ = HasOutput(node, kConfidenceMaskTag) ||
+                               HasOutput(node, kConfidenceMasksTag);
+    output_category_mask_ = HasOutput(node, kCategoryMaskTag);
+    if (!output_confidence_masks_ && !output_category_mask_) {
+      return absl::InvalidArgumentError(
+          "At least one of CONFIDENCE_MASK, CONFIDENCE_MASKS and CATEGORY_MASK "
+          "must be connected.");
+    }
+    return absl::OkStatus();
+  }
+
   // Adds a mediapipe image segmentation task pipeline graph into the provided
   // builder::Graph instance. The segmentation pipeline takes images
   // (mediapipe::Image) as the input and returns segmented image mask as output.
@@ -411,22 +477,41 @@ class ImageSegmenterGraph : public core::ModelTaskGraph {
     bool use_gpu =
         components::processors::DetermineImagePreprocessingGpuBackend(
             task_options.base_options().acceleration());
-    ASSIGN_OR_RETURN(auto image_and_tensors,
-                     ConvertImageToTensors(image_in, norm_rect_in, use_gpu,
-                                           model_resources, graph));
-    // Adds inference subgraph and connects its input stream to the output
-    // tensors produced by the ImageToTensorCalculator.
-    auto& inference = AddInference(
-        model_resources, task_options.base_options().acceleration(), graph);
-    image_and_tensors.tensors >> inference.In(kTensorsTag);
 
-    // Adds segmentation calculators for output streams.
+    // Adds segmentation calculators for output streams. Add this calculator
+    // first to get the labels.
     auto& tensor_to_images =
         graph.AddNode("mediapipe.tasks.TensorsToSegmentationCalculator");
     RET_CHECK_OK(ConfigureTensorsToSegmentationCalculator(
         task_options, model_resources,
         &tensor_to_images
              .GetOptions<TensorsToSegmentationCalculatorOptions>()));
+    const auto& tensor_to_images_options =
+        tensor_to_images.GetOptions<TensorsToSegmentationCalculatorOptions>();
+
+    // TODO: remove special logic for hair segmentation model.
+    // The alpha channel of hair segmentation model indicates the interested
+    // area. The model was designed for live stream mode, so that the mask of
+    // previous frame is used as the indicator for the next frame. For the first
+    // frame, it expects the alpha channel to be empty. To consolidate IMAGE,
+    // VIDEO and LIVE_STREAM mode in mediapipe tasks, here we forcely set the
+    // alpha channel to be empty if we find the model is the hair segmentation
+    // model.
+    bool is_hair_segmentation = false;
+    if (tensor_to_images_options.label_items_size() == 2 &&
+        tensor_to_images_options.label_items().at(1).name() == "hair") {
+      is_hair_segmentation = true;
+    }
+
+    ASSIGN_OR_RETURN(
+        auto image_and_tensors,
+        ConvertImageToTensors(image_in, norm_rect_in, use_gpu,
+                              is_hair_segmentation, model_resources, graph));
+    // Adds inference subgraph and connects its input stream to the output
+    // tensors produced by the ImageToTensorCalculator.
+    auto& inference = AddInference(
+        model_resources, task_options.base_options().acceleration(), graph);
+    image_and_tensors.tensors >> inference.In(kTensorsTag);
     inference.Out(kTensorsTag) >> tensor_to_images.In(kTensorsTag);
 
     // Adds image property calculator for output size.
@@ -435,23 +520,59 @@ class ImageSegmenterGraph : public core::ModelTaskGraph {
     image_properties.Out("SIZE") >> tensor_to_images.In(kOutputSizeTag);
 
     // Exports multiple segmented masks.
-    std::vector<Source<Image>> segmented_masks;
-    if (task_options.segmenter_options().output_type() ==
-        SegmenterOptions::CATEGORY_MASK) {
-      segmented_masks.push_back(
-          Source<Image>(tensor_to_images[Output<Image>(kSegmentationTag)]));
-    } else {
-      ASSIGN_OR_RETURN(const tflite::Tensor* output_tensor,
-                       GetOutputTensor(model_resources));
-      int segmentation_streams_num = *output_tensor->shape()->rbegin();
-      for (int i = 0; i < segmentation_streams_num; ++i) {
-        segmented_masks.push_back(Source<Image>(
-            tensor_to_images[Output<Image>::Multiple(kSegmentationTag)][i]));
+    // TODO: remove deprecated output type support.
+    if (task_options.segmenter_options().has_output_type()) {
+      std::vector<Source<Image>> segmented_masks;
+      if (task_options.segmenter_options().output_type() ==
+          SegmenterOptions::CATEGORY_MASK) {
+        segmented_masks.push_back(
+            Source<Image>(tensor_to_images[Output<Image>(kSegmentationTag)]));
+      } else {
+        ASSIGN_OR_RETURN(const tflite::Tensor* output_tensor,
+                         GetOutputTensor(model_resources));
+        int segmentation_streams_num = *output_tensor->shape()->rbegin();
+        for (int i = 0; i < segmentation_streams_num; ++i) {
+          segmented_masks.push_back(Source<Image>(
+              tensor_to_images[Output<Image>::Multiple(kSegmentationTag)][i]));
+        }
       }
+      auto quality_scores =
+          tensor_to_images[Output<std::vector<float>>(kQualityScoresTag)];
+      return ImageSegmenterOutputs{/*segmented_masks=*/segmented_masks,
+                                   /*confidence_masks=*/std::nullopt,
+                                   /*category_mask=*/std::nullopt,
+                                   /*quality_scores=*/quality_scores,
+                                   /*image=*/image_and_tensors.image};
+    } else {
+      std::optional<std::vector<Source<Image>>> confidence_masks;
+      if (output_confidence_masks_) {
+        ASSIGN_OR_RETURN(const tflite::Tensor* output_tensor,
+                         GetOutputTensor(model_resources));
+        int segmentation_streams_num = *output_tensor->shape()->rbegin();
+        confidence_masks = std::vector<Source<Image>>();
+        confidence_masks->reserve(segmentation_streams_num);
+        for (int i = 0; i < segmentation_streams_num; ++i) {
+          confidence_masks->push_back(Source<Image>(
+              tensor_to_images[Output<Image>::Multiple(kConfidenceMaskTag)]
+                              [i]));
+        }
+      }
+      std::optional<Source<Image>> category_mask;
+      if (output_category_mask_) {
+        category_mask = tensor_to_images[Output<Image>(kCategoryMaskTag)];
+      }
+      auto quality_scores =
+          tensor_to_images[Output<std::vector<float>>(kQualityScoresTag)];
+      return ImageSegmenterOutputs{/*segmented_masks=*/std::nullopt,
+                                   /*confidence_masks=*/confidence_masks,
+                                   /*category_mask=*/category_mask,
+                                   /*quality_scores=*/quality_scores,
+                                   /*image=*/image_and_tensors.image};
     }
-    return ImageSegmenterOutputs{/*segmented_masks=*/segmented_masks,
-                                 /*image=*/image_and_tensors.image};
   }
+
+  bool output_confidence_masks_ = false;
+  bool output_category_mask_ = false;
 };
 
 REGISTER_MEDIAPIPE_GRAPH(

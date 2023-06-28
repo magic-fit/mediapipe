@@ -1,4 +1,4 @@
-# Copyright 2022 The MediaPipe Authors. All Rights Reserved.
+# Copyright 2022 The MediaPipe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -84,7 +84,7 @@ class Dataset(object):
         create randomness during model training.
       preprocess: A function taking three arguments in order, feature, label and
         boolean is_training.
-      drop_remainder: boolean, whether the finaly batch drops remainder.
+      drop_remainder: boolean, whether the finally batch drops remainder.
 
     Returns:
       A TF dataset ready to be consumed by Keras model.

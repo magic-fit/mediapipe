@@ -1,4 +1,4 @@
-# Copyright 2022 The MediaPipe Authors. All Rights Reserved.
+# Copyright 2022 The MediaPipe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@ import numpy as np
 from scipy.io import wavfile
 
 from mediapipe.tasks.python.audio import audio_embedder
+from mediapipe.tasks.python.audio.core import audio_record
 from mediapipe.tasks.python.audio.core import audio_task_running_mode
 from mediapipe.tasks.python.components.containers import audio_data as audio_data_module
 from mediapipe.tasks.python.core import base_options as base_options_module
@@ -33,6 +34,7 @@ _AudioEmbedder = audio_embedder.AudioEmbedder
 _AudioEmbedderOptions = audio_embedder.AudioEmbedderOptions
 _AudioEmbedderResult = audio_embedder.AudioEmbedderResult
 _AudioData = audio_data_module.AudioData
+_AudioRecord = audio_record.AudioRecord
 _BaseOptions = base_options_module.BaseOptions
 _RUNNING_MODE = audio_task_running_mode.AudioTaskRunningMode
 
@@ -43,7 +45,7 @@ _SPEECH_WAV_48K_MONO = 'speech_48000_hz_mono.wav'
 _TWO_HEADS_WAV_16K_MONO = 'two_heads_16000_hz_mono.wav'
 _TEST_DATA_DIR = 'mediapipe/tasks/testdata/audio'
 _YAMNET_NUM_OF_SAMPLES = 15600
-_MILLSECONDS_PER_SECOND = 1000
+_MILLISECONDS_PER_SECOND = 1000
 # Tolerance for embedding vector coordinate values.
 _EPSILON = 3e-6
 
@@ -76,7 +78,7 @@ class AudioEmbedderTest(parameterized.TestCase):
       end = min(start + (int)(step_size), len(buffer))
       audio_data_list.append((_AudioData.create_from_array(
           buffer[start:end].astype(float) / np.iinfo(np.int16).max,
-          sample_rate), (int)(start / sample_rate * _MILLSECONDS_PER_SECOND)))
+          sample_rate), (int)(start / sample_rate * _MILLISECONDS_PER_SECOND)))
       start = end
     return audio_data_list
 
@@ -164,6 +166,19 @@ class AudioEmbedderTest(parameterized.TestCase):
                                   expected_result1_value)
       self.assertLen(embedding_result0_list, 5)
       self.assertLen(embedding_result1_list, 5)
+
+  @mock.patch('sounddevice.InputStream', return_value=mock.MagicMock())
+  def test_create_audio_record_from_embedder_succeeds(self, _):
+    # Creates AudioRecord instance using the embedder successfully.
+    with _AudioEmbedder.create_from_model_path(
+        self.yamnet_model_path
+    ) as embedder:
+      self.assertIsInstance(embedder, _AudioEmbedder)
+      record = embedder.create_audio_record(1, 16000, 16000)
+      self.assertIsInstance(record, _AudioRecord)
+      self.assertEqual(record.channels, 1)
+      self.assertEqual(record.sampling_rate, 16000)
+      self.assertEqual(record.buffer_size, 16000)
 
   def test_embed_with_yamnet_model_and_different_inputs(self):
     with _AudioEmbedder.create_from_model_path(

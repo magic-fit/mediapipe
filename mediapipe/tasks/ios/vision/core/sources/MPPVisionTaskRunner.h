@@ -58,40 +58,62 @@ NS_ASSUME_NONNULL_BEGIN
                                                  error:(NSError **)error NS_DESIGNATED_INITIALIZER;
 
 /**
- * Creates a `NormalizedRect` from a region of interest and an image orientation, performing
- * sanity checks on-the-fly.
- * If the input region of interest equals `CGRectZero`, returns a default `NormalizedRect` covering
- * the whole image with rotation set according `imageOrientation`. If `ROIAllowed` is NO, an error
- * will be returned if the input region of interest is not equal to `CGRectZero`. Mirrored
- * orientations (`UIImageOrientationUpMirrored`,`UIImageOrientationDownMirrored`,
+ * Creates a `NormalizedRect` from image orientation for a task which does not support roi,
+ * performing sanity checks on-the-fly. Mirrored orientations
+ * (`UIImageOrientationUpMirrored`,`UIImageOrientationDownMirrored`,
  * `UIImageOrientationLeftMirrored`,`UIImageOrientationRightMirrored`) are not supported. An error
  * will be returned if `imageOrientation` is equal to any one of them.
  *
- * @param roi A `CGRect` specifying the region of interest. If the input region of interest equals
- * `CGRectZero`, the returned `NormalizedRect` covers the whole image. Make sure that `roi` equals
- * `CGRectZero` if `ROIAllowed` is NO. Otherwise, an error will be returned.
  * @param imageOrientation A `UIImageOrientation` indicating the rotation to be applied to the
  * image. The resulting `NormalizedRect` will convert the `imageOrientation` to degrees clockwise.
  * Mirrored orientations (`UIImageOrientationUpMirrored`, `UIImageOrientationDownMirrored`,
  * `UIImageOrientationLeftMirrored`, `UIImageOrientationRightMirrored`) are not supported. An error
  * will be returned if `imageOrientation` is equal to any one of them.
- * @param ROIAllowed Indicates if the `roi` field is allowed to be a value other than `CGRectZero`.
+ * @param imageSize A `CGSize` specifying the size of the image within which normalized rect is
+ * calculated.
+ * @param error Pointer to the memory location where errors if any should be saved. If @c NULL, no
+ * error will be saved.
+ *
+ * @return An optional `NormalizedRect` from the given region of interest and image orientation.
+ */
+- (std::optional<mediapipe::NormalizedRect>)normalizedRectWithImageOrientation:
+                                                (UIImageOrientation)imageOrientation
+                                                                     imageSize:(CGSize)imageSize
+                                                                         error:(NSError **)error;
+
+/**
+ * Creates a `NormalizedRect` from roi and image orientation for a task which supports roi,
+ * performing sanity checks on-the-fly. If the input region of interest equals `CGRectZero`, returns
+ * a default `NormalizedRect` covering the whole image with rotation set according
+ * `imageOrientation`. Mirrored orientations
+ * (`UIImageOrientationUpMirrored`,`UIImageOrientationDownMirrored`,
+ * `UIImageOrientationLeftMirrored`,`UIImageOrientationRightMirrored`) are not supported. An error
+ * will be returned if `imageOrientation` is equal to any one of them.
+ *
+ * @param roi A `CGRect` specifying the region of interest. If the input region of interest equals
+ * `CGRectZero`, the returned `NormalizedRect` covers the whole image.
+ * @param imageOrientation A `UIImageOrientation` indicating the rotation to be applied to the
+ * image. The resulting `NormalizedRect` will convert the `imageOrientation` to degrees clockwise.
+ * Mirrored orientations (`UIImageOrientationUpMirrored`, `UIImageOrientationDownMirrored`,
+ * `UIImageOrientationLeftMirrored`, `UIImageOrientationRightMirrored`) are not supported. An error
+ * will be returned if `imageOrientation` is equal to any one of them.
+ * @param imageSize A `CGSize` specifying the size of the image within which normalized rect is
+ * calculated.
  * @param error Pointer to the memory location where errors if any should be saved. If @c NULL, no
  * error will be saved.
  *
  * @return An optional `NormalizedRect` from the given region of interest and image orientation.
  */
 - (std::optional<mediapipe::NormalizedRect>)
-    normalizedRectFromRegionOfInterest:(CGRect)roi
+    normalizedRectWithRegionOfInterest:(CGRect)roi
                       imageOrientation:(UIImageOrientation)imageOrientation
-                            ROIAllowed:(BOOL)ROIAllowed
+                             imageSize:(CGSize)imageSize
                                  error:(NSError **)error;
-
 /**
  * A synchronous method to invoke the C++ task runner to process single image inputs. The call
  * blocks the current thread until a failure status or a successful result is returned.
  *
- * @param packetMap A `PackeMap` containing pairs of input stream name and data packet.
+ * @param packetMap A `PacketMap` containing pairs of input stream name and data packet.
  * @param error Pointer to the memory location where errors if any should be
  * saved. If @c NULL, no error will be saved.
  *
@@ -105,7 +127,7 @@ NS_ASSUME_NONNULL_BEGIN
  * A synchronous method to invoke the C++ task runner to process continuous video frames. The call
  * blocks the current thread until a failure status or a successful result is returned.
  *
- * @param packetMap A `PackeMap` containing pairs of input stream name and data packet.
+ * @param packetMap A `PacketMap` containing pairs of input stream name and data packet.
  * @param error Pointer to the memory location where errors if any should be saved. If @c NULL, no
  * error will be saved.
  *
@@ -121,7 +143,7 @@ NS_ASSUME_NONNULL_BEGIN
  * available in the user-defined `packetsCallback` that was provided during initialization of the
  * `MPPVisionTaskRunner`.
  *
- * @param packetMap A `PackeMap` containing pairs of input stream name and data packet.
+ * @param packetMap A `PacketMap` containing pairs of input stream name and data packet.
  * @param error Pointer to the memory location where errors if any should be saved. If @c NULL, no
  * error will be saved.
  *
@@ -137,6 +159,20 @@ NS_ASSUME_NONNULL_BEGIN
                               packetsCallback:
                                   (mediapipe::tasks::core::PacketsCallback)packetsCallback
                                         error:(NSError **)error NS_UNAVAILABLE;
+
+/**
+ * This method returns a unique dispatch queue name by adding the given suffix and a `UUID` to the
+ * pre-defined queue name prefix for vision tasks. The vision tasks can use this method to get
+ * unique dispatch queue names which are consistent with other vision tasks.
+ * Dispatch queue names need not be unique, but for easy debugging we ensure that the queue names
+ * are unique.
+ *
+ * @param suffix A suffix that identifies a dispatch queue's functionality.
+ *
+ * @return A unique dispatch queue name by adding the given suffix and a `UUID` to the pre-defined
+ * queue name prefix for vision tasks.
+ */
++ (const char *)uniqueDispatchQueueNameWithSuffix:(NSString *)suffix;
 
 - (instancetype)init NS_UNAVAILABLE;
 

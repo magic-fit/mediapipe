@@ -1,4 +1,4 @@
-# Copyright 2022 The MediaPipe Authors. All Rights Reserved.
+# Copyright 2022 The MediaPipe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -15,9 +15,7 @@
 # Placeholder for internal Python strict library and test compatibility macro.
 # Placeholder for internal Python strict test compatibility macro.
 
-package(
-    default_visibility = ["//mediapipe:__subpackages__"],
-)
+package(default_visibility = ["//mediapipe:__subpackages__"])
 
 licenses(["notice"])
 
@@ -33,11 +31,11 @@ py_library(
     visibility = ["//visibility:public"],
     deps = [
         ":dataset",
+        ":hyperparameters",
         ":model_options",
         ":model_spec",
         ":text_classifier",
         ":text_classifier_options",
-        "//mediapipe/model_maker/python/core:hyperparameters",
     ],
 )
 
@@ -48,11 +46,17 @@ py_library(
 )
 
 py_library(
+    name = "hyperparameters",
+    srcs = ["hyperparameters.py"],
+    deps = ["//mediapipe/model_maker/python/core:hyperparameters"],
+)
+
+py_library(
     name = "model_spec",
     srcs = ["model_spec.py"],
     deps = [
+        ":hyperparameters",
         ":model_options",
-        "//mediapipe/model_maker/python/core:hyperparameters",
         "//mediapipe/model_maker/python/core/utils:file_util",
         "//mediapipe/model_maker/python/text/core:bert_model_spec",
     ],
@@ -63,9 +67,9 @@ py_test(
     srcs = ["model_spec_test.py"],
     tags = ["requires-net:external"],
     deps = [
+        ":hyperparameters",
         ":model_options",
         ":model_spec",
-        "//mediapipe/model_maker/python/core:hyperparameters",
     ],
 )
 
@@ -102,9 +106,9 @@ py_library(
     name = "text_classifier_options",
     srcs = ["text_classifier_options.py"],
     deps = [
+        ":hyperparameters",
         ":model_options",
         ":model_spec",
-        "//mediapipe/model_maker/python/core:hyperparameters",
     ],
 )
 
@@ -113,13 +117,14 @@ py_library(
     srcs = ["text_classifier.py"],
     deps = [
         ":dataset",
+        ":hyperparameters",
         ":model_options",
         ":model_spec",
         ":preprocessor",
         ":text_classifier_options",
-        "//mediapipe/model_maker/python/core:hyperparameters",
         "//mediapipe/model_maker/python/core/data:dataset",
         "//mediapipe/model_maker/python/core/tasks:classifier",
+        "//mediapipe/model_maker/python/core/utils:metrics",
         "//mediapipe/model_maker/python/core/utils:model_util",
         "//mediapipe/model_maker/python/core/utils:quantization",
         "//mediapipe/tasks/python/metadata/metadata_writers:metadata_writer",

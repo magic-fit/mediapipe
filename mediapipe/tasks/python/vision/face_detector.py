@@ -1,4 +1,4 @@
-# Copyright 2023 The MediaPipe Authors. All Rights Reserved.
+# Copyright 2023 The MediaPipe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -71,8 +71,8 @@ class FaceDetectorOptions:
 
   base_options: _BaseOptions
   running_mode: _RunningMode = _RunningMode.IMAGE
-  min_detection_confidence: Optional[float] = None
-  min_suppression_threshold: Optional[float] = None
+  min_detection_confidence: float = 0.5
+  min_suppression_threshold: float = 0.3
   result_callback: Optional[
       Callable[
           [detections_module.DetectionResult, image_module.Image, int], None
@@ -212,7 +212,7 @@ class FaceDetector(base_vision_task_api.BaseVisionTaskApi):
       RuntimeError: If face detection failed to run.
     """
     normalized_rect = self.convert_to_normalized_rect(
-        image_processing_options, roi_allowed=False
+        image_processing_options, image, roi_allowed=False
     )
     output_packets = self._process_image_data({
         _IMAGE_IN_STREAM_NAME: packet_creator.create_image(image),
@@ -261,7 +261,7 @@ class FaceDetector(base_vision_task_api.BaseVisionTaskApi):
       RuntimeError: If face detection failed to run.
     """
     normalized_rect = self.convert_to_normalized_rect(
-        image_processing_options, roi_allowed=False
+        image_processing_options, image, roi_allowed=False
     )
     output_packets = self._process_video_data({
         _IMAGE_IN_STREAM_NAME: packet_creator.create_image(image).at(
@@ -320,7 +320,7 @@ class FaceDetector(base_vision_task_api.BaseVisionTaskApi):
         detector has already processed.
     """
     normalized_rect = self.convert_to_normalized_rect(
-        image_processing_options, roi_allowed=False
+        image_processing_options, image, roi_allowed=False
     )
     self._send_live_stream_data({
         _IMAGE_IN_STREAM_NAME: packet_creator.create_image(image).at(

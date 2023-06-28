@@ -1,5 +1,5 @@
 /**
- * Copyright 2022 The MediaPipe Authors. All Rights Reserved.
+ * Copyright 2022 The MediaPipe Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ export type RunningMode = 'IMAGE'|'VIDEO';
 export declare interface VisionTaskOptions extends TaskRunnerOptions {
   /**
    * The canvas element to bind textures to. This has to be set for GPU
-   * processing. The task will initialize a WebGL context and throw an eror if
+   * processing. The task will initialize a WebGL context and throw an error if
    * this fails (e.g. if you have already initialized a different type of
    * context).
    */

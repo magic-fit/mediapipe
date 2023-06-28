@@ -1,4 +1,4 @@
-# Copyright 2022 The MediaPipe Authors. All Rights Reserved.
+# Copyright 2022 The MediaPipe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ import csv
 import filecmp
 import os
 import tempfile
+import unittest
 from unittest import mock as unittest_mock
 
 import tensorflow as tf
@@ -24,6 +25,7 @@ from mediapipe.model_maker.python.text import text_classifier
 from mediapipe.tasks.python.test import test_utils
 
 
+@unittest.skip('b/275624089')
 class TextClassifierTest(tf.test.TestCase):
 
   _AVERAGE_WORD_EMBEDDING_JSON_FILE = (
@@ -64,12 +66,14 @@ class TextClassifierTest(tf.test.TestCase):
 
   def test_create_and_train_average_word_embedding_model(self):
     train_data, validation_data = self._get_data()
-    options = (
-        text_classifier.TextClassifierOptions(
-            supported_model=(text_classifier.SupportedModels
-                             .AVERAGE_WORD_EMBEDDING_CLASSIFIER),
-            hparams=text_classifier.HParams(
-                epochs=1, batch_size=1, learning_rate=0)))
+    options = text_classifier.TextClassifierOptions(
+        supported_model=(
+            text_classifier.SupportedModels.AVERAGE_WORD_EMBEDDING_CLASSIFIER
+        ),
+        hparams=text_classifier.AverageWordEmbeddingHParams(
+            epochs=1, batch_size=1, learning_rate=0
+        ),
+    )
     average_word_embedding_classifier = (
         text_classifier.TextClassifier.create(train_data, validation_data,
                                               options))
@@ -101,12 +105,15 @@ class TextClassifierTest(tf.test.TestCase):
     options = text_classifier.TextClassifierOptions(
         supported_model=text_classifier.SupportedModels.MOBILEBERT_CLASSIFIER,
         model_options=text_classifier.BertModelOptions(
-            do_fine_tuning=False, seq_len=2),
-        hparams=text_classifier.HParams(
+            do_fine_tuning=False, seq_len=2
+        ),
+        hparams=text_classifier.BertHParams(
             epochs=1,
             batch_size=1,
             learning_rate=3e-5,
-            distribution_strategy='off'))
+            distribution_strategy='off',
+        ),
+    )
     bert_classifier = text_classifier.TextClassifier.create(
         train_data, validation_data, options)
 

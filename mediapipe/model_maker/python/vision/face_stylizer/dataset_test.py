@@ -1,4 +1,4 @@
-# Copyright 2023 The MediaPipe Authors. All Rights Reserved.
+# Copyright 2023 The MediaPipe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import numpy as np
 import tensorflow as tf
 
+from mediapipe.model_maker.python.vision.core import image_utils
 from mediapipe.model_maker.python.vision.face_stylizer import dataset
 from mediapipe.tasks.python.test import test_utils
 
@@ -22,11 +24,10 @@ class DatasetTest(tf.test.TestCase):
 
   def setUp(self):
     super().setUp()
-    # TODO: Replace the stylize image dataset with licensed images.
-    self._test_data_dirname = 'testdata'
 
   def test_from_folder(self):
-    input_data_dir = test_utils.get_test_data_path(self._test_data_dirname)
+    test_data_dirname = 'input/style'
+    input_data_dir = test_utils.get_test_data_path(test_data_dirname)
     data = dataset.Dataset.from_folder(dirname=input_data_dir)
     self.assertEqual(data.num_classes, 2)
     self.assertEqual(data.label_names, ['cartoon', 'sketch'])

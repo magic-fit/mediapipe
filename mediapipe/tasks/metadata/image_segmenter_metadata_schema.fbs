@@ -1,4 +1,4 @@
-// Copyright 2023 The MediaPipe Authors. All Rights Reserved.
+// Copyright 2023 The MediaPipe Authors.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -50,7 +50,7 @@ table ImageSegmenterOptions {
 
   // The minimum necessary image segmenter metadata parser version to fully
   // understand all fields in a given metadata flatbuffer. This field is
-  // automaticaly populated by the MetadataPopulator when the metadata is
+  // automatically populated by the MetadataPopulator when the metadata is
   // populated into a TFLite model. This min_parser_version is specific for the
   // image segmenter metadata defined in this schema file.
   min_parser_version:string;

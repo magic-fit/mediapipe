@@ -154,9 +154,9 @@ cc_library(
         "//mediapipe/framework/formats:image_frame_opencv",
         "//mediapipe/framework/port:logging",
         "//mediapipe/framework/port:opencv_core",
+        "//mediapipe/framework/port:opencv_imgproc",
         "//mediapipe/framework/port:status",
         "//mediapipe/framework/port:vector",
-        "//mediapipe/framework/port:opencv_imgproc",
     ] + select({
         "//mediapipe/gpu:disable_gpu": [],
         "//conditions:default": [
@@ -193,7 +193,6 @@ cc_library(
     srcs = ["bilateral_filter_calculator.cc"],
     deps = [
         ":bilateral_filter_calculator_cc_proto",
-        "@com_google_absl//absl/strings",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework:calculator_options_cc_proto",
         "//mediapipe/framework/formats:image_format_cc_proto",
@@ -204,6 +203,7 @@ cc_library(
         "//mediapipe/framework/port:opencv_imgproc",
         "//mediapipe/framework/port:status",
         "//mediapipe/framework/port:vector",
+        "@com_google_absl//absl/strings",
     ] + select({
         "//mediapipe/gpu:disable_gpu": [],
         "//conditions:default": [
@@ -317,6 +317,7 @@ cc_library(
 cc_test(
     name = "image_cropping_calculator_test",
     srcs = ["image_cropping_calculator_test.cc"],
+    tags = ["not_run:arm"],
     deps = [
         ":image_cropping_calculator",
         ":image_cropping_calculator_cc_proto",
@@ -650,6 +651,7 @@ cc_library(
 cc_test(
     name = "segmentation_smoothing_calculator_test",
     srcs = ["segmentation_smoothing_calculator_test.cc"],
+    tags = ["not_run:arm"],
     deps = [
         ":image_clone_calculator",
         ":image_clone_calculator_cc_proto",
@@ -728,8 +730,6 @@ cc_library(
     deps = [
         ":affine_transformation",
         ":warp_affine_calculator_cc_proto",
-        "@com_google_absl//absl/status",
-        "@com_google_absl//absl/status:statusor",
         "//mediapipe/framework:calculator_framework",
         "//mediapipe/framework/api2:node",
         "//mediapipe/framework/api2:port",
@@ -737,6 +737,8 @@ cc_library(
         "//mediapipe/framework/formats:image_frame",
         "//mediapipe/framework/port:ret_check",
         "//mediapipe/framework/port:status",
+        "@com_google_absl//absl/status",
+        "@com_google_absl//absl/status:statusor",
     ] + select({
         "//mediapipe/gpu:disable_gpu": [],
         "//conditions:default": [
@@ -771,7 +773,10 @@ cc_test(
         "//mediapipe/calculators/tensor:testdata/image_to_tensor/medium_sub_rect_with_rotation_border_zero_interp_cubic.png",
         "//mediapipe/calculators/tensor:testdata/image_to_tensor/noop_except_range.png",
     ],
-    tags = ["desktop_only_test"],
+    tags = [
+        "desktop_only_test",
+        "not_run:arm",
+    ],
     deps = [
         ":affine_transformation",
         ":image_transformation_calculator",

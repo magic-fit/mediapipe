@@ -1,4 +1,4 @@
-/* Copyright 2022 The MediaPipe Authors. All Rights Reserved.
+/* Copyright 2022 The MediaPipe Authors.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -111,7 +111,7 @@ TEST(MetadataVersionTest,
 TEST(MetadataVersionTest,
      GetMinimumMetadataParserVersionForModelMetadataVocabAssociatedFiles) {
   // Creates a metadata flatbuffer with the field,
-  // ModelMetadata.associated_fiels, populated with the vocabulary file type.
+  // ModelMetadata.associated_fields, populated with the vocabulary file type.
   FlatBufferBuilder builder(1024);
   AssociatedFileBuilder associated_file_builder(builder);
   associated_file_builder.add_type(tflite::AssociatedFileType_VOCABULARY);
@@ -159,8 +159,8 @@ TEST(MetadataVersionTest,
 TEST(MetadataVersionTest,
      GetMinimumMetadataParserVersionForInputMetadataVocabAssociatedFiles) {
   // Creates a metadata flatbuffer with the field,
-  // SubGraphMetadata.input_tensor_metadata.associated_fiels, populated with the
-  // vocabulary file type.
+  // SubGraphMetadata.input_tensor_metadata.associated_fields, populated with
+  // the vocabulary file type.
   FlatBufferBuilder builder(1024);
   AssociatedFileBuilder associated_file_builder(builder);
   associated_file_builder.add_type(tflite::AssociatedFileType_VOCABULARY);
@@ -184,7 +184,7 @@ TEST(MetadataVersionTest,
 TEST(MetadataVersionTest,
      GetMinimumMetadataParserVersionForOutputMetadataVocabAssociatedFiles) {
   // Creates a metadata flatbuffer with the field,
-  // SubGraphMetadata.output_tensor_metadata.associated_fiels, populated with
+  // SubGraphMetadata.output_tensor_metadata.associated_fields, populated with
   // the vocabulary file type.
   FlatBufferBuilder builder(1024);
   AssociatedFileBuilder associated_file_builder(builder);

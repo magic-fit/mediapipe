@@ -1,4 +1,4 @@
-# Copyright 2022 The MediaPipe Authors. All Rights Reserved.
+# Copyright 2022 The MediaPipe Authors.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -75,6 +75,15 @@ android_library(
     deps = [
         ":classifications",
         "//mediapipe/tasks/cc/components/containers/proto:classifications_java_proto_lite",
+        "//third_party:autovalue",
+        "@maven//:com_google_guava_guava",
+    ],
+)
+
+android_library(
+    name = "connection",
+    srcs = ["Connection.java"],
+    deps = [
         "//third_party:autovalue",
         "@maven//:com_google_guava_guava",
     ],

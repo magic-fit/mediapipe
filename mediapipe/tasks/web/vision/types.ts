@@ -1,5 +1,5 @@
 /**
- * Copyright 2023 The MediaPipe Authors. All Rights Reserved.
+ * Copyright 2023 The MediaPipe Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,11 @@
  */
 
 export * from '../../../tasks/web/core/fileset_resolver';
+export * from '../../../tasks/web/vision/core/drawing_utils';
+export {MPImage} from '../../../tasks/web/vision/core/image';
+export {MPMask} from '../../../tasks/web/vision/core/mask';
+export * from '../../../tasks/web/vision/face_detector/face_detector';
+export * from '../../../tasks/web/vision/face_landmarker/face_landmarker';
 export * from '../../../tasks/web/vision/face_stylizer/face_stylizer';
 export * from '../../../tasks/web/vision/gesture_recognizer/gesture_recognizer';
 export * from '../../../tasks/web/vision/hand_landmarker/hand_landmarker';
@@ -23,3 +28,4 @@ export * from '../../../tasks/web/vision/image_embedder/image_embedder';
 export * from '../../../tasks/web/vision/image_segmenter/image_segmenter';
 export * from '../../../tasks/web/vision/interactive_segmenter/interactive_segmenter';
 export * from '../../../tasks/web/vision/object_detector/object_detector';
+export * from '../../../tasks/web/vision/pose_landmarker/pose_landmarker';
